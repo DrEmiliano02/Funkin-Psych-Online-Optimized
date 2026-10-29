@@ -1,6 +1,8 @@
 package backend;
 
 
+import flixel.FlxG;
+import backend.system.OptimizedBitmapData;
 import openfl.utils.Future;
 import flixel.system.FlxAssets.FlxGraphicAsset;
 import flxanimate.data.SpriteMapData.FlxSpriteMap;
@@ -12,7 +14,6 @@ import flixel.math.FlxPoint;
 import flixel.math.FlxRect;
 
 import openfl.display.BitmapData;
-import openfl.display3D.textures.RectangleTexture;
 import openfl.utils.AssetType;
 import openfl.utils.Assets as OpenFlAssets;
 import openfl.system.System;
@@ -289,7 +290,7 @@ class Paths
 		}
 
 		if (bitmap != null) {
-			return bitmapToGraphic(file, bitmap);
+			return bitmapToGraphic(file, bitmap, allowGPU);
 		}
 
 		//STOP FUCKING USING TRACE ITS CPU HEAVY
@@ -340,18 +341,16 @@ class Paths
 		return null;
 	}
 
-	static public function bitmapToGraphic(file:String, bitmap:BitmapData) {
+	static public function bitmapToGraphic(file:String, bitmap:BitmapData, ?allowGPU:Bool = true):FlxGraphic
+	{
+		if (bitmap == null) return null;
 		localTrackedAssets.push(file);
-		// if (allowGPU /*&& ClientPrefs.data.cacheOnGPU*/)
-		// {
-		// 	var texture:RectangleTexture = FlxG.stage.context3D.createRectangleTexture(bitmap.width, bitmap.height, BGRA, true);
-		// 	texture.uploadFromBitmapData(bitmap);
-		// 	bitmap.image.data = null;
-		// 	bitmap.dispose();
-		// 	bitmap.disposeImage();
-		// 	bitmap = BitmapData.fromTexture(texture);
-		// }
+
 		var newGraphic:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, file);
+		if (newGraphic == null) return null;
+
+		OptimizedBitmapData.optimize(newGraphic.bitmap, allowGPU);
+
 		newGraphic.persist = true;
 		newGraphic.destroyOnNoUse = false;
 		currentTrackedAssets.set(file, newGraphic);
@@ -435,9 +434,9 @@ class Paths
 	static public function getAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		#if MODS_ALLOWED
-		if(FileSystem.exists(modsXml(key)) || OpenFlAssets.exists(getPath('images/$key.xml', library), TEXT))
+		if(FileSystem.exists(modsXml(key)) || OpenFlAssets.exists(getPath('images/$key.xml', TEXT, library), TEXT))
 		#else
-		if(OpenFlAssets.exists(getPath('images/$key.xml', library)))
+		if(OpenFlAssets.exists(getPath('images/$key.xml', TEXT, library), TEXT))
 		#end
 		{
 			return getSparrowAtlas(key, library);
@@ -452,7 +451,7 @@ class Paths
 			return sparrowAtlasCache.get(key + library);
 
 		#if MODS_ALLOWED
-		var imageLoaded:FlxGraphic = image(key, allowGPU);
+		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
 		var xmlExists:Bool = false;
 
 		var xml:String = modsXml(key);
@@ -460,9 +459,9 @@ class Paths
 			xmlExists = true;
 		}
 
-		var frames = FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (xmlExists ? File.getContent(xml) : getPath('images/$key.xml', library)));
+		var frames = FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : getPath('images/$key.xml', TEXT, library)));
 		#else
-		var frames = FlxAtlasFrames.fromSparrow(image(key, library, allowGPU), getPath('images/$key.xml', library));
+		var frames = FlxAtlasFrames.fromSparrow(image(key, library, allowGPU), getPath('images/$key.xml', TEXT, library));
 		#end
 
 		if (frames != null)
@@ -478,7 +477,7 @@ class Paths
 			return packerAtlasCache.get(key + library);
 
 		#if MODS_ALLOWED
-		var imageLoaded:FlxGraphic = image(key, allowGPU);
+		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
 		var txtExists:Bool = false;
 		
 		var txt:String = modsTxt(key);
@@ -486,9 +485,9 @@ class Paths
 			txtExists = true;
 		}
 
-		var frames = FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library, allowGPU)), (txtExists ? File.getContent(txt) : getPath('images/$key.txt', library)));
+		var frames = FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : getPath('images/$key.txt', TEXT, library)));
 		#else
-		var frames = FlxAtlasFrames.fromSpriteSheetPacker(image(key, library, allowGPU), getPath('images/$key.txt', library));
+		var frames = FlxAtlasFrames.fromSpriteSheetPacker(image(key, library, allowGPU), getPath('images/$key.txt', TEXT, library));
 		#end
 
 		if (frames != null)
