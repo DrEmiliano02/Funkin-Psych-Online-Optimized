@@ -8,7 +8,7 @@ class OptimizedBitmapData
 {
     public static var enabled:Bool = true;
 
-    public static var releaseCPUCopy:Bool = false;
+    public static var releaseCPUCopy:Bool = true;
 
     public static function optimize(bitmap:BitmapData, ?allowGPU:Bool = true):Void
     {
