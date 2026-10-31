@@ -532,7 +532,18 @@ class PlayState extends MusicBeatState
 	var showTime:Bool;
 	var camPos:FlxPoint;
 	var asyncLoop:FlxAsyncLoop;
+
+	static inline var PRELOAD_ASSETS_PER_FRAME:Int = 1;
+	var progressivePrecache:Array<{key:String, type:String}> = null;
+	var progressivePrecacheIndex:Int = 0;
+	#if debug
+	var progressivePrecacheStarted:Float = 0;
+	var progressivePrecachePeakRAM:Float = 0;
+	#end
+
 	var isCreated:Bool = false;
+    /** Used by BaseStage.precache to defer the loading of stage resources. */
+    public inline function isPreloadingAssets():Bool return !isCreated;
 	var stageExists:Bool = false;
 	public static var orderOffset:Int = 0;
 
@@ -1479,6 +1490,9 @@ class PlayState extends MusicBeatState
 		preloadTasks.push(() -> {
 			cacheCountdown();
 			cachePopUpScore();
+			// Primero se recopilan las claves. Luego update() carga una por frame.
+			progressivePrecache = [];
+			progressivePrecacheIndex = 0;
 			// Multiple stage/song preload directories can overlap.
 			var preloadedKeys:Map<String, Bool> = new Map();
 
@@ -1554,17 +1568,20 @@ class PlayState extends MusicBeatState
 					var cacheKey:String = type + ':' + key;
 					if (preloadedKeys.exists(cacheKey)) continue;
 					preloadedKeys.set(cacheKey, true);
-					switch(type)
-					{
-						case 'image':
-							Paths.image(key);
-						case 'sound':
-							Paths.sound(key);
-						case 'music':
-							Paths.music(key);
-					}
+					progressivePrecache.push({key: key, type: type});
 				}
 			}
+
+			if (progressivePrecache.length > 0) {
+				#if debug
+				progressivePrecacheStarted = haxe.Timer.stamp();
+				progressivePrecachePeakRAM = openfl.system.System.totalMemory;
+				#end
+				// Suspende solo la siguiente tarea de carga; update() reanuda
+				// FlxAsyncLoop una vez procesados todos los recursos de la cola.
+				asyncLoop.active = false;
+			}
+			else progressivePrecache = null;
 		});
 
 		if (GameClient.isConnected()) {
@@ -1658,10 +1675,13 @@ class PlayState extends MusicBeatState
 					add(debugPoser);
 				}
 
-				#if cpp
-				cpp.vm.Gc.run(false);
-				cpp.vm.Gc.compact();
-				#end
+				// Clean unused old graphics ONLY after the final preload task.
+				// Loaded / preloaded assets remain registered in localTrackedAssets.
+				Paths.clearUnusedMemory(false);
+
+				// Se libera lo que ya no se usa, sin System.gc() ni compactacion
+				// forzados justo antes de comenzar la cancion.
+
 			}
 		}, 1);
 		loaderGroup.add(asyncLoop);
@@ -3270,6 +3290,41 @@ class PlayState extends MusicBeatState
 			}
 
 			super.update(elapsed);
+
+			// Una carga maxima por frame evita los largos bloques de precacheList.
+			// Todos los accesos a FlxGraphic y Context3D siguen en el hilo principal.
+			if (progressivePrecache != null) {
+				var remaining:Int = progressivePrecache.length - progressivePrecacheIndex;
+				var count:Int = Std.int(Math.min(PRELOAD_ASSETS_PER_FRAME, remaining));
+				for (i in 0...count) {
+					var asset = progressivePrecache[progressivePrecacheIndex++];
+					switch (asset.type) {
+						case 'image': Paths.image(asset.key);
+						case 'sound': Paths.sound(asset.key);
+						case 'music': Paths.music(asset.key);
+						default:
+					}
+				}
+				// Report real per-file progress instead of an unmoving task bar.
+                loaderGroup.addAssetProgress(preloadTasks.length, progressivePrecacheIndex, progressivePrecache.length);
+				#if debug
+				var currentRAM:Float = openfl.system.System.totalMemory;
+				if (currentRAM > progressivePrecachePeakRAM)
+					progressivePrecachePeakRAM = currentRAM;
+				#end
+
+				if (progressivePrecacheIndex >= progressivePrecache.length) {
+					#if debug
+					Log.info('Bitmap v3: ' + progressivePrecacheIndex + ' recursos precargados en '
+						+ Std.int((haxe.Timer.stamp() - progressivePrecacheStarted) * 1000)
+						+ ' ms; pico RAM observado: '
+						+ Std.int(progressivePrecachePeakRAM / (1024 * 1024)) + ' MiB');
+					#end
+					progressivePrecache = null;
+					progressivePrecacheIndex = 0;
+					asyncLoop.active = true;
+				}
+			}
 			return;
 		}
 
@@ -5873,6 +5928,10 @@ class PlayState extends MusicBeatState
 	}
 
 	override function destroy() {
+		// No conservar referencias a tareas de una carga interrumpida.
+		progressivePrecache = null;
+		progressivePrecacheIndex = 0;
+
 		#if LUA_ALLOWED
 		for (i in 0...luaArray.length) {
 			var lua:FunkinLua = luaArray[0];

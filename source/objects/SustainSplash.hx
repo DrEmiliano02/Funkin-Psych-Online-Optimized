@@ -131,6 +131,19 @@ class SustainSplash extends FlxSprite {
 		update(0);
 	}
 
+	// FlxTimer callbacks capture this sprite. Cancel when leaving the
+    // state to avoid retaining graphics/notes after the group is destroyed.
+    override public function destroy():Void
+    {
+        if (timer != null)
+        {
+            timer.cancel();
+            timer = null;
+        }
+        strumNote = null;
+        super.destroy();
+    }
+
 	public static function getSplashSkinPostfix() {
 		var skin:String = '';
 		if (ClientPrefs.data.splashSkin != ClientPrefs.defaultData.splashSkin)

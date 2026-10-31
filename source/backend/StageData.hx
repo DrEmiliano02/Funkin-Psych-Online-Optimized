@@ -156,9 +156,15 @@ class StageData {
 	public static function addObjectsToState(objectList:Array<Dynamic>, gf:FlxSprite, dad:FlxSprite, boyfriend:FlxSprite, ?group:Dynamic = null, ?ignoreFilters:Bool = false, ?ignoreNames:Array<String> = null)
 	{
 		var addedObjects:Map<String, FlxSprite> = [];
+        if (objectList == null) return addedObjects;
 		for (num => data in objectList)
 		{
-			if (addedObjects.exists(data) || (ignoreNames != null && ignoreNames.contains(data.name))) continue;
+            if (data == null) continue;
+            var dataName:String = data.name;
+            // The map is indexed by String; checking the entire Dynamic
+            // object never identified a duplicated stage sprite reliably.
+			if ((dataName != null && addedObjects.exists(dataName)) ||
+                (ignoreNames != null && ignoreNames.contains(dataName))) continue;
 
 			switch(data.type)
 			{

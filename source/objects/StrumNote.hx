@@ -85,11 +85,14 @@ class StrumNote extends FlxSprite
 				Note.colArray = Note.getColArrayFromKeys(true);
 			}
 
-			loadGraphic(graphic);
-			if (!texture.endsWith('_ODD'))
-				width = width / 4;
-			height = height / 5;
-			loadGraphic(Paths.image('pixelUI/' + texture), true, Math.floor(width), Math.floor(height));
+			// Reuse the same cached FlxGraphic and avoid constructing the
+            // temporary full-image graphic before the sprite sheet.
+            if (graphic == null) return;
+            var columns:Int = texture.endsWith('_ODD') ? 1 : 4;
+            var cellWidth:Int = Std.int(graphic.width / columns);
+            var cellHeight:Int = Std.int(graphic.height / 5);
+            if (cellWidth <= 0 || cellHeight <= 0) return;
+            loadGraphic(graphic, true, cellWidth, cellHeight);
 
 			antialiasing = false;
 			setGraphicSize(Std.int(width * PlayState.daPixelZoom * Note.noteScale));
@@ -105,7 +108,7 @@ class StrumNote extends FlxSprite
 		else
 		{
 			frames = Paths.getSparrowAtlas(texture);
-			if (graphic == null && texture.endsWith('_ODD')) {
+			if (frames == null && texture.endsWith('_ODD')) {
 				@:bypassAccessor texture = texture.substring(0, texture.length - '_ODD'.length);
 				frames = Paths.getSparrowAtlas(texture);
 				Note.colArray = Note.getColArrayFromKeys(true);

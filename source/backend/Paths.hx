@@ -56,7 +56,7 @@ class Paths
 		'assets/images/bf2.png',
 	];
 	/// haya I love you for the base cache dump I took to the max
-	public static function clearUnusedMemory() {
+	public static function clearUnusedMemory(?collectGarbage:Bool = true):Void {
 		// clear non local assets in the tracked assets list
 		for (key in currentTrackedAssets.keys()) {
 			// if it is not currently contained within the used local assets
@@ -78,8 +78,9 @@ class Paths
 			}
 		}
 
-		// run the garbage collector for good measure lmfao
-		System.gc();
+		// La compilacion de memoria se evita en mitad o al final de una precarga.
+		// Mantener true para conservar el comportamiento anterior en otras llamadas.
+		if (collectGarbage) System.gc();
 	}
 
 	// define the locally tracked assets

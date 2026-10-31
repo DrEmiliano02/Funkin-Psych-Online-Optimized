@@ -142,8 +142,13 @@ class BaseStage extends FlxBasic
 
 	public function precache(key:String, type:String)
 	{
-		if(onPlayState)
-			PlayState.instance.precacheList.set(key, type);
+		if (onPlayState && PlayState.instance != null)
+        {
+            PlayState.instance.precacheList.set(key, type);
+            // Enqueue stage assets during song loading instead of decoding
+            // all of them immediately in BaseStage.create().
+            if (PlayState.instance.isPreloadingAssets()) return;
+        }
 
 		switch(type)
 		{
