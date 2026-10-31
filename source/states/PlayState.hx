@@ -534,6 +534,8 @@ class PlayState extends MusicBeatState
 	var asyncLoop:FlxAsyncLoop;
 	// Loading UI shared by create() and progressive precache in update().
 	var loaderGroup:online.objects.LoadingSprite;
+	// Shared by create() and update() for per-file loading progress.
+	var preloadTasks:Array<Void->Void> = [];
 
 	// Bitmap Optimized v3: un recurso de precache por frame en lugar de
 	// cargar todas las imagenes en una sola iteracion de FlxAsyncLoop.
@@ -656,7 +658,7 @@ class PlayState extends MusicBeatState
 		canPause = !redditMod; // !(GameClient.isConnected() || redditMod);
 		canStart = !GameClient.isConnected();
 
-		var preloadTasks:Array<Void->Void> = [];
+		preloadTasks = [];
 
 		preloadTasks.push(() -> {
 			// Log.trace('Playback Rate: ' + playbackRate);
