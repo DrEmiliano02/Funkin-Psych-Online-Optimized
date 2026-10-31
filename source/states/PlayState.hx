@@ -532,7 +532,12 @@ class PlayState extends MusicBeatState
 	var showTime:Bool;
 	var camPos:FlxPoint;
 	var asyncLoop:FlxAsyncLoop;
+	// Loading UI shared by create() and progressive precache in update().
+	var loaderGroup:online.objects.LoadingSprite;
 
+	// Bitmap Optimized v3: un recurso de precache por frame en lugar de
+	// cargar todas las imagenes en una sola iteracion de FlxAsyncLoop.
+	// Es trabajo SINCRONO repartido en frames, NO decodificacion en otro hilo.
 	static inline var PRELOAD_ASSETS_PER_FRAME:Int = 1;
 	var progressivePrecache:Array<{key:String, type:String}> = null;
 	var progressivePrecacheIndex:Int = 0;
@@ -1630,7 +1635,7 @@ class PlayState extends MusicBeatState
 			setOnScripts('duoOpponentSID', duoOpponentSID);
 		});
 
-		var loaderGroup = new online.objects.LoadingSprite(preloadTasks.length, camLoading);
+		loaderGroup = new online.objects.LoadingSprite(preloadTasks.length, camLoading);
 		add(loaderGroup);
 		
 		// var i = 0;
