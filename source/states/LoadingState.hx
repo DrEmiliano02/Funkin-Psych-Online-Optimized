@@ -45,7 +45,13 @@ class LoadingState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, FlxG.height, 0xffcaff4d);
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		add(bg);
-		funkay = new FlxSprite(0, 0).loadGraphic(Paths.getPath('images/funkay.png', IMAGE));
+		// Prefer the central tracked graphic instead of opening a parallel cache entry.
+		// Fallback keeps loading screens functional before shared assets are ready.
+		var funkayGraphic = Paths.image('funkay', null, false);
+		if (funkayGraphic != null)
+			funkay = new FlxSprite(0, 0).loadGraphic(funkayGraphic);
+		else
+			funkay = new FlxSprite(0, 0).loadGraphic(Paths.getPath('images/funkay.png', IMAGE));
 		funkay.setGraphicSize(0, FlxG.height);
 		funkay.updateHitbox();
 		add(funkay);
@@ -111,8 +117,13 @@ class LoadingState extends MusicBeatState
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
-		funkay.setGraphicSize(Std.int(0.88 * FlxG.width + 0.9 * (funkay.width - 0.88 * FlxG.width)));
-		funkay.updateHitbox();
+		// setGraphicSize/updateHitbox are unnecessary if rounded size is unchanged.
+		var newWidth:Int = Std.int(0.88 * FlxG.width + 0.9 * (funkay.width - 0.88 * FlxG.width));
+		if (newWidth != Std.int(funkay.width))
+		{
+			funkay.setGraphicSize(newWidth);
+			funkay.updateHitbox();
+		}
 		if(controls.ACCEPT)
 		{
 			funkay.setGraphicSize(Std.int(funkay.width + 60));

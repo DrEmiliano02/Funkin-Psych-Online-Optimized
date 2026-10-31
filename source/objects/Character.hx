@@ -252,13 +252,20 @@ class Character extends FlxSprite {
 				}
 				#end
 
-				if (!isAnimateAtlas && frames != null) {
-					for (_imgFile in split) {
-						final imgFile = _imgFile.trim(); 
-						if (!imageFile.contains(imgFile))
-							imageFile += ',$imgFile';
+				// Primary atlas already lives in `frames`. Never add it to itself.
+				// Skip repeated image names in character JSONs to avoid duplicate work.
+				if (!isAnimateAtlas && frames != null && split.length > 1) {
+					var seenAtlases:Map<String, Bool> = new Map();
+					seenAtlases.set(imageFile, true);
+
+					for (i in 1...split.length) {
+						final imgFile = split[i].trim();
+						if (imgFile.length == 0 || seenAtlases.exists(imgFile)) continue;
+						seenAtlases.set(imgFile, true);
+						imageFile += ',' + imgFile;
+
 						var daAtlas = Paths.getAtlas(imgFile);
-						if (daAtlas != null)
+						if (daAtlas != null && daAtlas != frames)
 							cast(frames, FlxAtlasFrames).addAtlas(daAtlas);
 					}
 				}

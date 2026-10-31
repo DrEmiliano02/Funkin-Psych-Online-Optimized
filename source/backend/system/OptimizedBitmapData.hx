@@ -3,38 +3,25 @@ package backend.system;
 import flixel.FlxG;
 import openfl.display.BitmapData;
 
-@:access(openfl.display.BitmapData)
 class OptimizedBitmapData
 {
     public static var enabled:Bool = true;
 
-    public static var releaseCPUCopy:Bool = true;
-
-    public static function optimize(bitmap:BitmapData, ?allowGPU:Bool = true):Void
+    public static function prepare(bitmap:BitmapData, ?allowGPU:Bool = true):Void
     {
         #if (cpp && !mobile)
-        if (!enabled || !allowGPU || bitmap == null || !bitmap.readable)
-            return;
-
-        if (FlxG.stage == null || FlxG.stage.context3D == null)
-            return;
+        if (!enabled || !allowGPU || bitmap == null) return;
+        if (FlxG.stage == null || FlxG.stage.context3D == null) return;
 
         try
         {
-            var texture = bitmap.getTexture(FlxG.stage.context3D);
-            if (texture == null) return;
-
-            if (releaseCPUCopy)
-            {
-                bitmap.disposeImage();
-                bitmap.__surface = null;
-                bitmap.image = null;
-            }
+            // OpenFL internally reuses an existing texture for this Context3D.
+            bitmap.getTexture(FlxG.stage.context3D);
         }
         catch (e:Dynamic)
         {
             #if debug
-            trace('OptimizedBitmapData.optimize(): ' + Std.string(e));
+            trace('GPU prewarm failed (kept CPU image): ' + Std.string(e));
             #end
         }
         #end

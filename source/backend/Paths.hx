@@ -1,9 +1,9 @@
 package backend;
 
 
+import openfl.utils.Future;
 import flixel.FlxG;
 import backend.system.OptimizedBitmapData;
-import openfl.utils.Future;
 import flixel.system.FlxAssets.FlxGraphicAsset;
 import flxanimate.data.SpriteMapData.FlxSpriteMap;
 import flxanimate.frames.FlxAnimateFrames;
@@ -63,7 +63,8 @@ class Paths
 			if (!localTrackedAssets.contains(key) && !dumpExclusions.contains(key)) {
 				var obj = currentTrackedAssets.get(key);
 				@:privateAccess
-				if (obj != null) {
+				// FlxGraphic may still be held by a sprite, an atlas or a transition.
+				if (obj != null && obj.useCount <= 0) {
 					// remove the key from all cache maps
 					FlxG.bitmap._cache.remove(key);
 					openfl.Assets.cache.removeBitmapData(key);
@@ -83,12 +84,20 @@ class Paths
 
 	// define the locally tracked assets
 	public static var localTrackedAssets:Array<String> = [];
+
+	// Avoid duplicate local entries when the same texture is requested repeatedly.
+	static inline function trackLocalAsset(key:String):Void
+	{
+		if (key != null && !localTrackedAssets.contains(key))
+			localTrackedAssets.push(key);
+	}
+
 	public static function clearStoredMemory(?cleanUnused:Bool = false) {
 		// clear anything not in the tracked assets list
 		@:privateAccess
 		for (key => obj in FlxG.bitmap._cache)
 		{
-			if (obj != null && !currentTrackedAssets.exists(key) && !dumpExclusions.contains(key)) {
+			if (obj != null && obj.useCount <= 0 && !currentTrackedAssets.exists(key) && !dumpExclusions.contains(key)) {
 				openfl.Assets.cache.removeBitmapData(key);
 				FlxG.bitmap._cache.remove(key);
 				// pointer not found?
@@ -271,7 +280,7 @@ class Paths
 		file = modsImages(key);
 		if (currentTrackedAssets.exists(file))
 		{
-			localTrackedAssets.push(file);
+			trackLocalAsset(file);
 			return currentTrackedAssets.get(file);
 		}
 		else if (FileSystem.exists(file))
@@ -282,7 +291,7 @@ class Paths
 			file = getPath('images/$key.png', IMAGE, library);
 			if (currentTrackedAssets.exists(file))
 			{
-				localTrackedAssets.push(file);
+				trackLocalAsset(file);
 				return currentTrackedAssets.get(file);
 			}
 			else if (OpenFlAssets.exists(file, IMAGE))
@@ -313,7 +322,7 @@ class Paths
 		// return cached
 		if (currentTrackedAssets.exists(file))
 		{
-			localTrackedAssets.push(file);
+			trackLocalAsset(file);
 			return Future.withValue(currentTrackedAssets.get(file).bitmap);
 		}
 		// found in the mods files
@@ -326,7 +335,7 @@ class Paths
 			file = getPath('images/$key.png', IMAGE, library);
 			if (currentTrackedAssets.exists(file))
 			{
-				localTrackedAssets.push(file);
+				trackLocalAsset(file);
 				return Future.withValue(currentTrackedAssets.get(file).bitmap);
 			}
 			else if (OpenFlAssets.exists(file, IMAGE))
@@ -341,19 +350,21 @@ class Paths
 		return null;
 	}
 
+	/** Converts a decoded image into a tracked graphic on the main thread. */
 	static public function bitmapToGraphic(file:String, bitmap:BitmapData, ?allowGPU:Bool = true):FlxGraphic
 	{
 		if (bitmap == null) return null;
-		localTrackedAssets.push(file);
+		trackLocalAsset(file);
 
 		var newGraphic:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, file);
 		if (newGraphic == null) return null;
 
-		OptimizedBitmapData.optimize(newGraphic.bitmap, allowGPU);
-
 		newGraphic.persist = true;
 		newGraphic.destroyOnNoUse = false;
 		currentTrackedAssets.set(file, newGraphic);
+
+		// No BitmapData replacement: keep existing FlxGraphic/FlxAtlasFrames refs valid.
+		OptimizedBitmapData.prepare(newGraphic.bitmap, allowGPU);
 		return newGraphic;
 	}
 

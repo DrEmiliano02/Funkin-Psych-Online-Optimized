@@ -1479,7 +1479,9 @@ class PlayState extends MusicBeatState
 		preloadTasks.push(() -> {
 			cacheCountdown();
 			cachePopUpScore();
-			
+			// Multiple stage/song preload directories can overlap.
+			var preloadedKeys:Map<String, Bool> = new Map();
+
 			for (folderOrFile => type in precacheList)
 			{
 				final ext = switch (type) {
@@ -1549,6 +1551,9 @@ class PlayState extends MusicBeatState
 				}
 
 				for (key in keys) {
+					var cacheKey:String = type + ':' + key;
+					if (preloadedKeys.exists(cacheKey)) continue;
+					preloadedKeys.set(cacheKey, true);
 					switch(type)
 					{
 						case 'image':
@@ -1664,7 +1669,8 @@ class PlayState extends MusicBeatState
 		orderOffset = 2;
 
 		super.create();
-		Paths.clearUnusedMemory();
+		// Do not purge again here: FlxAsyncLoop has not executed its preload tasks.
+		// The initial purge above handles resources from the previous state.
 	}
 
 	var debugPoser:online.objects.DebugPosHelper;
